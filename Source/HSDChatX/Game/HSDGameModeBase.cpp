@@ -323,6 +323,8 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
 {
    if (!IsValid(InChattingPlayerController)) return;
 
+   AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
+
    if (3 == InStrikeCount)
    {
       AHSDPlayerState* HDPS = InChattingPlayerController->GetPlayerState<AHSDPlayerState>();
@@ -339,7 +341,6 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
          }
          ResetGame();
          
-         AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
          if (IsValid(HSDGS)) HSDGS->CurrentTurnPlayerState = nullptr; 
       }
    }
@@ -362,10 +363,12 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
             }
          }
       }
-      
+
       if (bIsDraw == true)
       {
-         FString AnnounceMsg = FString::Printf(TEXT("모든 기회 소진! 무승부... (정답은 [%s] 였습니다)"), *SecretNumberString);
+         GetWorldTimerManager().ClearTimer(TurnTimerHandle);
+         
+         FString AnnounceMsg = FString::Printf(TEXT("모든 기회 소진! 무승부... (정답: %s)"), *SecretNumberString);
          for (AHSDPlayerController* HDPlayerController : AllPlayerControllers)
          {
             if (IsValid(HDPlayerController))
@@ -374,26 +377,28 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
             }
          }
          
-         FString ChatSystemMsg = TEXT("모든 기회 소진으로 무승부 처리되었습니다. 이전 정답: ") + SecretNumberString;
+         FString ChatSystemMsg = TEXT("[시스템] 모든 기회 소진으로 무승부 처리되었습니다. 이전 정답: ") + SecretNumberString;
          for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
          {
             if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(ChatSystemMsg); }
          }
          
-         ResetGame();
-         
-         FString NewGameMsg = TEXT("[시스템] ---------------- 새로운 게임이 시작되었습니다! ----------------");
-         for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
+         GetWorldTimerManager().SetTimer(TurnTimerHandle, FTimerDelegate::CreateLambda([this, HSDGS]()
          {
-            if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(NewGameMsg); }
-         }
-         
-         AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
-         if (IsValid(HSDGS) && AllPlayerControllers.Num() > 0)
-         {
-             HSDGS->CurrentTurnPlayerState = AllPlayerControllers[0]->GetPlayerState<AHSDPlayerState>();
-             StartNewTurn();
-         }
+             ResetGame();
+
+             FString NewGameMsg = TEXT("[시스템] ---------------- 새로운 게임이 시작되었습니다! ----------------");
+             for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
+             {
+                if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(NewGameMsg); }
+             }
+
+             if (IsValid(HSDGS) && AllPlayerControllers.Num() > 0)
+             {
+                 HSDGS->CurrentTurnPlayerState = AllPlayerControllers[0]->GetPlayerState<AHSDPlayerState>();
+                 StartNewTurn(); 
+             }
+         }), 3.0f, false); 
       }
    }
 }
