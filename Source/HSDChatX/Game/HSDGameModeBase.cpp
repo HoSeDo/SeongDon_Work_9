@@ -1,4 +1,4 @@
-#include "Game/HSDGameModeBase.h" // 💡 프로젝트 경로에 맞게 수정
+#include "Game/HSDGameModeBase.h" 
 #include "HSDGameStateBase.h"
 #include "Player/HSDPlayerController.h"
 #include "Player/HSDPlayerState.h"
@@ -54,44 +54,43 @@ void AHSDGameModeBase::PrintChatMessageString(AHSDPlayerController* InChattingPl
    
     if (CleanedMessageString.Len() == 3 && IsGuessNumberString(CleanedMessageString))
     {
-        if (IsValid(HSDGS) && IsValid(ChattingPS))
-        {
-            if (HSDGS->TurnTimeRemaining <= 0 || HSDGS->CurrentTurnPlayerState != ChattingPS)
-            {
-                InChattingPlayerController->NotificationText = FText::FromString(TEXT("지금은 숫자를 입력할 수 없습니다! (턴/시간 확인)"));
-                return;
-            }
-        }
+       if (IsValid(HSDGS) && IsValid(ChattingPS))
+       {
+          if (HSDGS->TurnTimeRemaining <= 0 || HSDGS->CurrentTurnPlayerState != ChattingPS)
+          {
+             InChattingPlayerController->NotificationText = FText::FromString(TEXT("지금은 숫자를 입력할 수 없습니다! (턴/시간 확인)"));
+             return;
+          }
+       }
        
-        if (IsValid(HSDGS)) HSDGS->bHasGuessedThisTurn = true;
-
-        // 시도 횟수 차감 및 닉네임 결합
-        IncreaseGuessCount(InChattingPlayerController);
-        FString PlayerPrefix = IsValid(ChattingPS) ? ChattingPS->GetPlayerInfoString() + TEXT(": ") : TEXT("Unknown: ");
-        FString JudgeResultString = JudgeResult(SecretNumberString, CleanedMessageString);
-        FString CombinedMessageString = PlayerPrefix + CleanedMessageString + TEXT(" -> ") + JudgeResultString;
+       if (IsValid(HSDGS)) HSDGS->bHasGuessedThisTurn = true;
+       
+       IncreaseGuessCount(InChattingPlayerController);
+       FString PlayerPrefix = IsValid(ChattingPS) ? ChattingPS->GetPlayerInfoString() + TEXT(": ") : TEXT("Unknown: ");
+       FString JudgeResultString = JudgeResult(SecretNumberString, CleanedMessageString);
+       FString CombinedMessageString = PlayerPrefix + CleanedMessageString + TEXT(" -> ") + JudgeResultString;
         
-        for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
-        {
-            if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(CombinedMessageString); }
-        }
-
-        // 스트라이크 판정
-        int32 StrikeCount = 0;
-        for (int32 i = 0; i < 3; ++i) { if (SecretNumberString[i] == CleanedMessageString[i]) StrikeCount++; }
+       for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
+       {
+          if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(CombinedMessageString); }
+       }
+       
+       int32 StrikeCount = 0;
+       for (int32 i = 0; i < 3; ++i) { if (SecretNumberString[i] == CleanedMessageString[i]) StrikeCount++; }
         
-        if (StrikeCount == 3)
-        {
-            JudgeGame(InChattingPlayerController, StrikeCount);
-        }
+       JudgeGame(InChattingPlayerController, StrikeCount);
+       
+       if (StrikeCount != 3 && IsValid(ChattingPS) && ChattingPS->CurrentGuessCount > 0)
+       {
+          AdvanceTurn();
+       }
+       else
+       {
+          AdvanceTurn();
+       }
+    }
         else
         {
-            AdvanceTurn();
-        }
-    }
-    else
-    {
-        // 일반 채팅은 턴/시간 제약 없이 상시 허용
         FString PlayerPrefix = IsValid(ChattingPS) ? ChattingPS->GetPlayerInfoString() + TEXT(": ") : TEXT("Unknown: ");
         FString CombinedMessageString = PlayerPrefix + InChatMessageString;
         for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
@@ -144,7 +143,6 @@ void AHSDGameModeBase::HandleTimeOut()
    AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
    if (IsValid(HSDGS) && IsValid(HSDGS->CurrentTurnPlayerState))
    {
-      // 활동 체크: 해당 턴에 숫자를 입력하지 않았다면 강제로 기회(시도 횟수) 1회 패널티 차감!
       if (HSDGS->bHasGuessedThisTurn == false)
       {
          for (AHSDPlayerController* PC : AllPlayerControllers)
@@ -158,12 +156,22 @@ void AHSDGameModeBase::HandleTimeOut()
                { 
                   if (IsValid(EachPC)) EachPC->ClientRPCPrintChatMessageString(PenaltyMsg); 
                }
+               
+               JudgeGame(PC, 0); 
                break;
             }
          }
       }
    }
-   AdvanceTurn();
+   
+   if (IsValid(HSDGS) && HSDGS->CurrentTurnPlayerState != nullptr)
+   {
+      AHSDPlayerState* CurrentPS = HSDGS->CurrentTurnPlayerState;
+      if (CurrentPS && CurrentPS->CurrentGuessCount > 0)
+      {
+         AdvanceTurn();
+      }
+   }
 }
 
 void AHSDGameModeBase::AdvanceTurn()
@@ -321,8 +329,7 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
       if (IsValid(HDPS))
       {
          FString CombinedMessageString = HDPS->PlayerNameString + TEXT(" 님이 승리하였습니다!");
-          
-         // 💡 타입을 명시적으로 수정
+         
          for (AHSDPlayerController* HDPlayerController : AllPlayerControllers)
          {
             if (IsValid(HDPlayerController))
@@ -331,13 +338,15 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
             }
          }
          ResetGame();
+         
+         AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
+         if (IsValid(HSDGS)) HSDGS->CurrentTurnPlayerState = nullptr; 
       }
    }
-   
    else
    {
       bool bIsDraw = true;
-      // 💡 타입을 명시적으로 수정
+      
       for (AHSDPlayerController* HDPlayerController : AllPlayerControllers)
       {
          if (IsValid(HDPlayerController))
@@ -353,17 +362,38 @@ void AHSDGameModeBase::JudgeGame(AHSDPlayerController* InChattingPlayerControlle
             }
          }
       }
-
+      
       if (bIsDraw == true)
       {
+         FString AnnounceMsg = FString::Printf(TEXT("모든 기회 소진! 무승부... (정답은 [%s] 였습니다)"), *SecretNumberString);
          for (AHSDPlayerController* HDPlayerController : AllPlayerControllers)
          {
             if (IsValid(HDPlayerController))
             {
-               HDPlayerController->NotificationText = FText::FromString(TEXT("모든 기회 소진! 무승부..."));
+               HDPlayerController->NotificationText = FText::FromString(AnnounceMsg);
             }
          }
+         
+         FString ChatSystemMsg = TEXT("모든 기회 소진으로 무승부 처리되었습니다. 이전 정답: ") + SecretNumberString;
+         for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
+         {
+            if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(ChatSystemMsg); }
+         }
+         
          ResetGame();
+         
+         FString NewGameMsg = TEXT("[시스템] ---------------- 새로운 게임이 시작되었습니다! ----------------");
+         for (TActorIterator<AHSDPlayerController> It(GetWorld()); It; ++It)
+         {
+            if (IsValid(*It)) { (*It)->ClientRPCPrintChatMessageString(NewGameMsg); }
+         }
+         
+         AHSDGameStateBase* HSDGS = GetGameState<AHSDGameStateBase>();
+         if (IsValid(HSDGS) && AllPlayerControllers.Num() > 0)
+         {
+             HSDGS->CurrentTurnPlayerState = AllPlayerControllers[0]->GetPlayerState<AHSDPlayerState>();
+             StartNewTurn();
+         }
       }
    }
 }

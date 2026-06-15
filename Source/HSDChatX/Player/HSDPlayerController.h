@@ -32,7 +32,7 @@ protected:
 	// [채팅창 UI 관련 변수 클래스 및 인스턴스]
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Chat")
 	TSubclassOf<UHSDChatinput> ChatInputWidgetClass;
-    
+	
 	UPROPERTY()
 	TObjectPtr<UHSDChatinput> ChatInputWidgetInstance;
     

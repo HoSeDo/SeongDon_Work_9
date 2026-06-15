@@ -15,26 +15,31 @@ void AHSDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
     
-	if (IsLocalController() == false) return;
-    
-	FInputModeUIOnly InputModeUIOnly;
-	SetInputMode(InputModeUIOnly);
+	if (IsLocalController() == false) return; //
 	
-	if (IsValid(ChatInputWidgetClass) == true)
+	FInputModeGameAndUI InputModeData;
+	
+	InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+	InputModeData.SetHideCursorDuringCapture(false);
+	SetInputMode(InputModeData);
+	
+	bShowMouseCursor = true;
+
+	if (IsValid(ChatInputWidgetClass) == true) //
 	{
-		ChatInputWidgetInstance = CreateWidget<UHSDChatinput>(this, ChatInputWidgetClass);
-		if (IsValid(ChatInputWidgetInstance) == true)
+		ChatInputWidgetInstance = CreateWidget<UHSDChatinput>(this, ChatInputWidgetClass); //
+		if (IsValid(ChatInputWidgetInstance) == true) //
 		{
-			ChatInputWidgetInstance->AddToViewport();
+			ChatInputWidgetInstance->AddToViewport(); //
 		}
 	}
-	
-	if (IsValid(NotificationTextWidgetClass) == true)
+    
+	if (IsValid(NotificationTextWidgetClass) == true) //
 	{
-		NotificationTextWidgetInstance = CreateWidget<UUserWidget>(this, NotificationTextWidgetClass);
-		if (IsValid(NotificationTextWidgetInstance) == true)
+		NotificationTextWidgetInstance = CreateWidget<UUserWidget>(this, NotificationTextWidgetClass); //
+		if (IsValid(NotificationTextWidgetInstance) == true) //
 		{
-			NotificationTextWidgetInstance->AddToViewport();
+			NotificationTextWidgetInstance->AddToViewport(); //
 		}
 	}
 }
